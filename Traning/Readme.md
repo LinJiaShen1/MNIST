@@ -101,6 +101,44 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 # 調用訓練函數
 train_model(model, train_loader, criterion, optimizer)
 ```
+若是有採用Dataloader，則會改成:
+```
+best_val_loss = np.inf
+for epoch in range(num_epochs):
+    model.train()  # 確保模型處於訓練模式，啟用 Dropout 等
+    for features, labels in train_loader:
+        features, labels = features.to(device), labels.to(device)
+        outputs = model(features)
+        loss = loss_function(outputs, labels)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    # 訓練過程結束後，在驗證數據集上評估模型
+    model.eval()  # 將模型切換到評估模式，關閉 Dropout 等
+    val_loss = 0
+    correct = 0
+    with torch.no_grad():  # 在評估模式下，不更新梯度
+        for features, labels in val_loader:
+            features, labels = features.to(device), labels.to(device)
+            outputs = model(features)
+            val_loss += loss_function(outputs, labels).item()  # 累計損失
+            preds = outputs.argmax(dim=1, keepdim=True)  # 獲取預測結果
+            correct += preds.eq(labels.view_as(preds)).sum().item()  # 計算正確預測的數量
+
+    val_loss /= len(val_loader.dataset)
+    if val_loss< best_val_loss:
+        best_val_loss = val_loss
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            }, './tmp/weight.pth')
+    val_accuracy = 100. * correct / len(val_loader.dataset)
+    print(f'Epoch {epoch+1}, Train Loss: {loss.item()}, Validation Loss: {val_loss}, Validation Accuracy: {val_accuracy}%')
+```
 ## 5.評估模型 (evaluate)
 模型評估可以通過以下方式進行：
 ```
@@ -114,11 +152,13 @@ def evaluate_model(model, test_loader):
             _, predicted = torch.max(output.data, 1)
             total += target.size(0)
             correct += (predicted == target).sum().item()
-    print(f'Accuracy: {100 * correct / total}%')
+    accuracy = 100 * correct / total
+    print(f'Accuracy: {accuracy}%')
 
 # 假設 test_loader 是你的測試數據加載器
 evaluate_model(model, test_loader)
 ```
+
 
 ## 6.儲存模型 (save)
 最後，你可能想要儲存你訓練好的模型，以便之後使用或進行部署：
