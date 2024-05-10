@@ -32,30 +32,52 @@ print(torch.cuda.is_available())
 這將顯示你安裝的 PyTorch 版本，並檢查 CUDA 是否可用（對於使用 NVIDIA GPU 的用戶）。對於 Mac 用戶，通常 torch.cuda.is_available() 會返回 False，除非你使用的是外接的 GPU 或特殊配置。  
 
 ### CNN 模型
-這是一個簡易的CNN模型，可以參考Kaggle上其他人的模型建置。
+這是一個簡易的CNN模型，可以參考[Kaggle](https://www.kaggle.com/code/fatihonuragac/cnn-with-digit-recognizer-99)上其他人的模型建置。
 ```
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.fc1 = nn.Linear(64 * 14 * 14, 128)
-        self.fc2 = nn.Linear(128, 10)
+        # 第一層卷積層
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)
+        self.maxpool1 = nn.MaxPool2d(pool_size=(2, 2))
+        self.dropout1 = nn.Dropout(0.25)
+
+        # 第二層卷積層
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=3, padding=1)
+        self.maxpool2 = nn.MaxPool2d(pool_size=(2, 2), stride=2)
+        self.dropout2 = nn.Dropout(0.25)
+
+        # 全連接層
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(32 * 7 * 7, 256)  # 計算方式依據圖像經過兩次池化後的大小
+        self.dropout3 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(256, 10)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 14 * 14)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-```
+        x = F.relu(self.conv1(x))
+        x = self.maxpool1(x)
+        x = self.dropout1(x)
 
+        x = F.relu(self.conv2(x))
+        x = self.maxpool2(x)
+        x = self.dropout2(x)
+
+        x = self.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = self.dropout3(x)
+        x = self.fc2(x)
+        return F.log_softmax(x, dim=1)
+
+# 創建模型實例
+model = SimpleCNN()
+print(model)
+```
+說明：
+1. 卷積層（Conv2D）：nn.Conv2d 用於創建卷積層，在 PyTorch 中，padding='same' 的效果需要手動計算，或者使用特殊的 padding 方式來達到Keras 中的 same 效果。
+2. 池化層（MaxPool2D）：nn.MaxPool2d 用於創建池化層，可以指定池化窗口大小和步長。
+3. Dropout 層：nn.Dropout 用於防止過擬合。
+4. 全連接層（Dense）：nn.Linear 用於創建全連接層。
+5. 激活函數：ReLU 激活函數在每個卷積和全連接層之後使用。最後的輸出層使用 softmax 函數，這裡在 PyTorch 中使用 F.log_softmax 以便於計算損失（通常與 nn.NLLLoss 一起使用）。
 ## 4. 訓練模型 (fit)
 訓練模型需要準備訓練循環和優化器。這裡是一個基本的訓練循環示例：  
 ```
