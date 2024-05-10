@@ -69,6 +69,7 @@ for label in labels:
 ```
 pip install opencv-python
 pip install numpy
+pip install -U scikit-learn=1.3.0
 ```
 #### 讀取圖片
 接著，你可以用以下程式碼來讀取圖片：
