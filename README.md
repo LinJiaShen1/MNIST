@@ -122,6 +122,13 @@ cv2.destroyAllWindows()  # 關閉所有 OpenCV 開啟的窗口
 1. 訓練資料（Training Data）: 用於訓練模型，使模型學習如何從輸入數據預測或分類輸出。
 2. 驗證資料（Validation Data）: 用於模型訓練過程中的參數調整，驗證資料幫助確認不同超參數的設置對模型效果的影響。
 3. 測試資料（Test Data）: 在模型開發過程中保持獨立，用於最終評估模型的效能，以此來模擬模型對新數據的反應如何。
+#### 對Y資料進行 One-hot Encoding
+One-hot 編碼是一種處理類別標籤的方法，它將每個類別標籤轉換為一個只一位是 1，其餘位都是 0 的二進制表示。這種方法對於類別輸出的神經網絡非常有用，特別是在進行多類分類時。
+```
+from sklearn.preprocessing import OneHotEncoder
+encoder = OneHotEncoder(sparse=False)
+y_one_hot = encoder.fit_transform(y.reshape(-1, 1))
+```
 #### 實現數據集分割
 可以使用 Python 的 sklearn 庫來輕鬆地分割數據。首先，確保安裝了 sklearn：
 ```
@@ -143,3 +150,80 @@ X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test
 其中，
 1. 數據分層：在使用 train_test_split 時，你可以透過 stratify 參數來保證訓練集、驗證集和測試集中的類別分佈與原始數據集保持一致。
 2. 隨機種子（Random Seed）：設置 random_state 參數可以確保每次執行代碼時，數據分割的方式都保持一致。
+
+## 2.資料前處理 (Normalization)
+
+### 2.0 前言
+#### 安裝 PyTorch 的前置條件
+首先，確保你的 macOS 上已經安裝了 Python。Python 可以通過官方網站、Homebrew 或 Anaconda 來安裝。如果你使用的是 Anaconda，那麼管理 Python 環境和庫會更加方便。  
+#### 使用 Conda 安裝 PyTorch
+如果你已經安裝了 Anaconda，可以使用 Conda 來安裝 PyTorch，這通常是最簡單的方式，因為 Conda 會自動處理所有依賴性。打開終端並輸入以下命令：  
+```
+conda install pytorch torchvision torchaudio -c pytorch
+```
+這個命令會從 PyTorch 的官方 channel 安裝最新版本的 PyTorch，以及 torchvision 和 torchaudio，這兩個庫常用於圖像和音頻處理。  
+#### 使用 Pip 安裝 PyTorch
+如果你傾向於使用 pip，可以按照以下步驟進行。首先，打開你的終端，然後輸入以下命令：  
+```
+pip install torch torchvision torchaudio
+```
+#### 選擇適合你硬件的安裝選項
+如果你的 Mac 支持 GPU，並且你希望 PyTorch 能夠利用這一點來加速計算，則需要確保安裝了適用於 Mac 的 GPU 版本的 PyTorch。目前，PyTorch 對 Apple Silicon (M1/M2 芯片) 的支持正在進行中，並且已經有了一些進展，例如可以使用為 Apple Silicon 優化的 PyTorch 版本。詳情可以查看 PyTorch 官方網站或相關社區的更新。
+#### 驗證安裝
+```
+import torch
+print(torch.__version__)
+print(torch.cuda.is_available())
+```
+這將顯示你安裝的 PyTorch 版本，並檢查 CUDA 是否可用（對於使用 NVIDIA GPU 的用戶）。對於 Mac 用戶，通常 torch.cuda.is_available() 會返回 False，除非你使用的是外接的 GPU 或特殊配置。  
+
+### 2.1 轉換數據為Tensor
+將數據轉換成 PyTorch tensors 是實現模型訓練的一個必要步驟，因為PyTorch 使用 tensor 來進行所有計算。  
+```
+import torch
+
+# 假設 X_train, X_val, X_test 已經是預處理好的特徵數據
+X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
+X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+
+# 將 y_one_hot 轉換為 tensor
+y_train_tensor = torch.tensor(y_train_one_hot, dtype=torch.float32)
+y_val_tensor = torch.tensor(y_val_one_hot, dtype=torch.float32)
+y_test_tensor = torch.tensor(y_test_one_hot, dtype=torch.float32)
+```
+
+### 2.2 使用DataLoader
+```
+from torch.utils.data import Dataset
+
+class CustomDataset(Dataset):
+    def __init__(self, features, labels):
+        '初始化數據集，這裡的 features 和 labels 應該是已經轉換好的 tensors'
+        self.features = features
+        self.labels = labels
+
+    def __len__(self):
+        '返回數據集中的樣本數量'
+        return len(self.features)
+
+    def __getitem__(self, index):
+        '按照給定的索引 index 返回一個樣本和其標籤'
+        return self.features[index], self.labels[index]
+```
+定義完後可以宣告
+```
+from torch.utils.data import DataLoader
+
+# 假設 X_train_tensor 和 y_train_tensor 已經是處理好的訓練數據和標籤的 tensors
+train_dataset = CustomDataset(X_train_tensor, y_train_tensor)
+# 創建 DataLoader，設置批次大小和是否洗牌
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+val_dataset = CustomDataset(X_val_tensor, y_val_tensor)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+test_dataset = CustomDataset(X_test_tensor, y_test_tensor)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+```
+
